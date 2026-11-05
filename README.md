@@ -1,8 +1,8 @@
 # Stance UI
 
-A **standalone Matcha UI library** inspired by the Mono interface from Matcha Animation Changer. It provides reusable windows, tabs, sections, components, themes, saved flags, and a mouse/keyboard interaction layer, using Matcha's `Drawing` API.
+A **standalone Matcha UI library**, built by the same creator as Matcha Animation Changer and extracted from its original Mono UI. It provides reusable windows, tabs, sections, components, themes, saved flags, and a mouse/keyboard interaction layer, using Matcha's `Drawing` API.
 
-**Independent project:** Stance UI contains **no animation catalog, asset IDs, animation playback engine, or dependency on Animation-Market**.
+**Separate repository, shared creator:** Stance UI contains **no animation catalog, asset IDs, animation playback engine, or dependency on Animation-Market**.
 
 > **Release status: v0.1.0 — initial implementation.** Source syntax and a mocked Lua runtime smoke test have passed. Rendering and interaction have **not yet been tested inside Matcha/Roblox**; the project should be treated as a beta until that is done.
 
