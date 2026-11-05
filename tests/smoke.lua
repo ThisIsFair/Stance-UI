@@ -54,6 +54,7 @@ game = {GetService = function(_, name) return assert(services[name], name) end}
 
 local ui = assert(dofile("Source.lua"))
 assert(ui.Version == "0.1.0")
+assert(_G.StanceUI == ui, "library must export itself to _G.StanceUI")
 local w = ui:CreateWindow({Id="Test", Title="Demo", Position={100,60}, Size={880,620}, ConfigFile="test.json"})
 local tab = w:CreateTab("Main")
 local sec = tab:CreateSection("Testing")
@@ -152,24 +153,28 @@ assert(toggle:Get() == false)
 w:Destroy()
 assert(ui:GetStats().windows == 0)
 ui:Unload()
+assert(_G.StanceUI == nil, "unload should clear the exported global")
 assert(removed == made, string.format("drawing leak: made %d removed %d", made, removed))
 assert(inputEnabled == true)
 print("PASS: mocked Stance UI smoke test; " .. made .. " drawing instances cleaned up")
 
 -- Verify the shipped example script initializes and fully cleans up with the same mocked API.
-loadstring = load
-local originalReadfile = readfile
-readfile = function(name)
-    if name == "Source.lua" then
-        local file = assert(io.open("Source.lua", "rb"))
-        local body = file:read("*a")
-        file:close()
-        return body
-    end
-    return originalReadfile(name)
+-- Matcha-specific regression: a loaded chunk runs but returns NO values.
+loadstring = function(source)
+    local chunk = assert(load(source))
+    return function(...) chunk(...) end
+end
+httpget = function(url)
+    assert(url == "https://raw.githubusercontent.com/ThisIsFair/Stance-UI/main/Source.lua")
+    local file = assert(io.open("Source.lua", "rb"))
+    local body = file:read("*a")
+    file:close()
+    return body
 end
 assert(dofile("examples/Example.lua") == nil)
 assert(type(_G.StanceUIUnload) == "function", "example did not initialize library")
+assert(type(_G.StanceUI) == "table", "Matcha-style loadstring lost the exported library")
 _G.StanceUIUnload()
+assert(_G.StanceUI == nil, "example unload left stale global")
 assert(removed == made, "example left drawing objects behind")
 print("PASS: shipped example initializes and unloads with mock runtime")

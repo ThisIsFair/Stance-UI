@@ -1,5 +1,6 @@
--- Stance UI example. Load the library directly from GitHub.
-local Stance = loadstring(httpget("https://raw.githubusercontent.com/ThisIsFair/Stance-UI/main/Source.lua"))()
+-- Stance UI example. Matcha does not return values from loadstring chunks.
+local Stance = loadstring(httpget("https://raw.githubusercontent.com/ThisIsFair/Stance-UI/main/Source.lua"))() or _G.StanceUI
+assert(type(Stance) == "table" and type(Stance.CreateWindow) == "function", "Stance UI failed to initialize; check Matcha console")
 
 local Window = Stance:CreateWindow({
     Id = "example",

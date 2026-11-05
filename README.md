@@ -21,7 +21,7 @@ A **standalone Matcha UI library** from the [Matcha Animation Changer project](h
 **Local loading:** Copy `Source.lua` into Matcha's accessible workspace and load it with:
 
 ```lua
-local Stance = loadstring(readfile("Source.lua"))()
+local Stance = loadstring(readfile("Source.lua"))() or _G.StanceUI
 ```
 
 **Remote loading from this repository's `main` branch:**
@@ -29,8 +29,10 @@ local Stance = loadstring(readfile("Source.lua"))()
 ```lua
 local Stance = loadstring(httpget(
     "https://raw.githubusercontent.com/ThisIsFair/Stance-UI/main/Source.lua"
-))()
+))() or _G.StanceUI
 ```
+
+Matcha discards top-level return values from `loadstring` chunks; Stance UI exposes the instance as `_G.StanceUI` for compatibility.
 
 Create a window and controls:
 

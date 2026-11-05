@@ -1340,7 +1340,10 @@ function Stance:Unload()
     Engine.focus, Engine.capture, Engine.popup, Engine.drag = nil, nil, nil, nil
     if type(setrobloxinput) == "function" then pcall(setrobloxinput, true) end
     Engine.blocked = false
-    if type(_G) == "table" and _G.StanceUIUnload == self._unloadFn then _G.StanceUIUnload = nil end
+    if type(_G) == "table" then
+        if _G.StanceUIUnload == self._unloadFn then _G.StanceUIUnload = nil end
+        if _G.StanceUI == self then _G.StanceUI = nil end
+    end
 end
 Stance.Destroy = Stance.Unload
 
@@ -1381,6 +1384,9 @@ local function connectRunService()
     end
 end
 Stance._unloadFn = function() Stance:Unload() end
-if type(_G) == "table" then _G.StanceUIUnload = Stance._unloadFn end
+if type(_G) == "table" then
+    _G.StanceUIUnload = Stance._unloadFn
+    _G.StanceUI = Stance -- Matcha loadstring() drops top-level return values.
+end
 connectRunService()
 return Stance

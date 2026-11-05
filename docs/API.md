@@ -5,7 +5,7 @@ The API is intentionally declarative. Create windows, then tabs, then sections, 
 ## Initialization and lifecycle
 
 ```lua
-local Stance = loadstring(readfile("Source.lua"))()
+local Stance = loadstring(readfile("Source.lua"))() or _G.StanceUI
 
 local Window = Stance:CreateWindow({
     Id = "my-script",                  -- Optional; stable identifier
@@ -45,7 +45,7 @@ Stance:Unload() -- clears every window, drawing, event connection and input capt
 
 `Stance:CreateWindow()` can be called more than once. `Stance:GetWindow(id)` locates an instance. `Stance:Notify(...)` uses the last window if present. `Stance:GetStats()` returns Drawing pool counts and input state. `Stance:Render()` and `Stance:Step(dt)` are provided for deterministic testing; in Matcha, the frame loop is normally automatic.
 
-Rerunning `Source.lua` unloads the previous Stance UI instance via `_G.StanceUIUnload` to avoid duplicate event handlers.
+Matcha discards top-level `loadstring()` return values, so the library is also exposed as `_G.StanceUI`. Rerunning `Source.lua` unloads the previous Stance UI instance via `_G.StanceUIUnload` to avoid duplicate event handlers.
 
 ## Tabs and sections
 
