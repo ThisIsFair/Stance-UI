@@ -1,0 +1,6 @@
+# Local runtime configs, logs, and editor metadata
+stance_ui_*.json
+*.log
+.vscode/
+.idea/
+.DS_Store
