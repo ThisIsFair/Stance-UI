@@ -54,7 +54,8 @@ local services = {
 game = {GetService = function(_, name) return assert(services[name], name) end}
 
 local ui = assert(dofile("Source.lua"))
-assert(ui.Version == "0.2.0")
+assert(ui.Version == "0.3.0")
+assert(ui:Calibrate({CENTER_BOTH_AXES=true, TEXT_DY=0, ALPHA_INVERTED=false, CHAR_W=0.54}))
 assert(_G.StanceUI == ui, "library must export itself to _G.StanceUI")
 local w = ui:CreateWindow({Id="Test", Title="Demo", Position={100,60}, Size={880,620}, ConfigFile="test.json"})
 local tab = w:CreateTab("Main")
@@ -165,6 +166,8 @@ assert(type(wheelCallback) == "function")
 w:Confirm({Title="Confirm", Content="A test", OnConfirm=function() presses=presses+1 end})
 ui:Render()
 assert(ui:GetStats().windows == 1)
+assert(w.MinWidth == 760 and w.MinHeight == 600, "must retain Stance Mono minimum sizes")
+assert(ui:GetStats().triangles == 0, "triangle pool should be initialized")
 click(680, 430)
 assert(presses == 2, "confirm dialog button failed")
 w:Notify({Title="Hello", Content="Works", Duration=1})

@@ -1,4 +1,4 @@
--- Stance UI 0.2.0 | Reusable Matcha UI with the original Stance Mono design
+-- Stance UI 0.3.0 | Adapted from the original Stance v4 Mono UI-only source
 -- No external project dependencies. Designed for the Matcha executor runtime.
 
 assert(type(Drawing) == "table" and type(Drawing.new) == "function", "Stance UI requires Matcha Drawing.new")
@@ -9,17 +9,19 @@ if type(_G) == "table" and type(_G.StanceUIUnload) == "function" then
     pcall(_G.StanceUIUnload)
 end
 
-local VERSION = "0.2.0"
+local VERSION = "0.3.0"
 local Stance = { Version = VERSION, Windows = {}, Flags = {}, Destroyed = false }
 local Engine = {
-    pools = { Square = {}, Text = {}, Line = {} },
-    used = { Square = 0, Text = 0, Line = 0 },
+    pools = { Square = {}, Text = {}, Line = {}, Triangle = {} },
+    used = { Square = 0, Text = 0, Line = 0, Triangle = 0 },
     regions = {}, connections = {}, alive = true,
     lastDown = false, lastMouseX = 0, lastMouseY = 0,
     mouseX = 0, mouseY = 0, drag = nil, focus = nil, capture = nil,
     popup = nil, wheel = 0, blocked = nil,
     lastPaint = 0, lastStep = 0, dirty = true, typingKey = nil, repeatAt = 0,
     heldKeys = {}, toasts = {}, lastSave = 0,
+    painted = {}, lastFrameX = nil, lastFrameY = nil, lastDragPaint = 0, dragMoved = false,
+    casBound = false, casRetryAt = 0, casName = "StanceUILibraryTypingSink",
 }
 
 local function clamp(n, lo, hi) return math.max(lo, math.min(hi, n)) end
@@ -80,6 +82,8 @@ end
 local fonts = Drawing.Fonts or {}
 local FONT = fonts.System or fonts.UI or fonts.Monospace or 0
 local BOLD = fonts.SystemBold or FONT
+-- Calibration values copied from the user's Stance v4 Mono UI-only implementation.
+local CALIBRATION = {CENTER_BOTH_AXES = true, TEXT_DY = 0, ALPHA_INVERTED = false, CHAR_W = 0.54}
 local cornerSupported, fontSizeSupported = nil, nil
 
 local function property(entry, name, value)
@@ -102,6 +106,8 @@ local function take(kind)
         elseif kind == "Text" then
             obj.Outline = false
             if fontSizeSupported == nil then fontSizeSupported = pcall(function() obj.FontSize = 14 end) end
+        elseif kind == "Triangle" then
+            obj.Filled = true
         end
         entry = { obj = obj }
         pool[i] = entry
@@ -111,45 +117,64 @@ end
 local function rect(x, y, w, h, rgb, radius, z, opacity)
     if w <= 0 or h <= 0 then return end
     local e = take("Square")
-    local px, py, pw, ph = round(x), round(y), math.max(1, round(w)), math.max(1, round(h))
+    local px, py = round(x), round(y)
+    local pw, ph = math.max(1, round(x + w) - px), math.max(1, round(y + h) - py)
     if e.px ~= px or e.py ~= py then property(e, "Position", Vector2.new(px, py)); e.px, e.py = px, py end
     if e.pw ~= pw or e.ph ~= ph then property(e, "Size", Vector2.new(pw, ph)); e.pw, e.ph = pw, ph end
     property(e, "Color", color3(rgb))
-    property(e, "Transparency", clamp(opacity or 1, 0, 1))
+    property(e, "Transparency", CALIBRATION.ALPHA_INVERTED and (1 - clamp(opacity or 1, 0, 1)) or clamp(opacity or 1, 0, 1))
     property(e, "ZIndex", z or 1)
-    if cornerSupported then property(e, "Corner", clamp(round(radius or 0), 0, round(math.min(pw, ph) / 2))) end
+    if cornerSupported then property(e, "Corner", clamp(round(radius or 0), 0, math.floor(math.min(pw, ph) / 2))) end
     property(e, "Visible", true)
 end
 local function line(x1, y1, x2, y2, rgb, z, thickness, opacity)
     local e = take("Line")
-    property(e, "From", Vector2.new(round(x1), round(y1)))
-    property(e, "To", Vector2.new(round(x2), round(y2)))
+    local ax, ay, bx, by = round(x1), round(y1), round(x2), round(y2)
+    if e.ax ~= ax or e.ay ~= ay then property(e, "From", Vector2.new(ax, ay)); e.ax, e.ay = ax, ay end
+    if e.bx ~= bx or e.by ~= by then property(e, "To", Vector2.new(bx, by)); e.bx, e.by = bx, by end
     property(e, "Color", color3(rgb))
     property(e, "Thickness", thickness or 1)
-    property(e, "Transparency", clamp(opacity or 1, 0, 1))
+    property(e, "Transparency", CALIBRATION.ALPHA_INVERTED and (1 - clamp(opacity or 1, 0, 1)) or clamp(opacity or 1, 0, 1))
     property(e, "ZIndex", z or 1)
     property(e, "Visible", true)
 end
-local function textWidth(str, size) return #tostring(str or "") * size * 0.54 end
+local function triangle(ax, ay, bx, by, cx, cy, rgb, z, opacity)
+    local e = take("Triangle")
+    if e.ax ~= ax or e.ay ~= ay then property(e, "PointA", Vector2.new(round(ax), round(ay))); e.ax, e.ay = ax, ay end
+    if e.bx ~= bx or e.by ~= by then property(e, "PointB", Vector2.new(round(bx), round(by))); e.bx, e.by = bx, by end
+    if e.cx ~= cx or e.cy ~= cy then property(e, "PointC", Vector2.new(round(cx), round(cy))); e.cx, e.cy = cx, cy end
+    property(e, "Color", color3(rgb))
+    property(e, "Transparency", CALIBRATION.ALPHA_INVERTED and (1 - clamp(opacity or 1, 0, 1)) or clamp(opacity or 1, 0, 1))
+    property(e, "ZIndex", z or 1)
+    property(e, "Visible", true)
+end
+local function textWidth(str, size) return #tostring(str or "") * size * CALIBRATION.CHAR_W end
 local function fitted(str, width, size)
     str = tostring(str or "")
     if width <= 0 then return "" end
     if textWidth(str, size) <= width then return str end
-    local maxChars = math.max(1, math.floor(width / (size * 0.54)) - 2)
+    local maxChars = math.max(1, math.floor(width / (size * CALIBRATION.CHAR_W)) - 2)
     return str:sub(1, maxChars) .. ".."
 end
 local function drawText(str, x, cy, size, rgb, z, isBold, centered, opacity)
     local e = take("Text")
     local fontSize = round(size)
     property(e, "Text", tostring(str or ""))
-    property(e, "Position", Vector2.new(round(x), round(cy - fontSize / 2)))
+    -- Original Stance uses centered Matcha text anchors for centered labels only.
+    local textY = cy + CALIBRATION.TEXT_DY
+    if not (centered and CALIBRATION.CENTER_BOTH_AXES) then textY = textY - fontSize / 2 end
+    local px, py = round(x), round(textY)
+    if e.px ~= px or e.py ~= py then
+        property(e, "Position", Vector2.new(px, py))
+        e.px, e.py = px, py
+    end
     property(e, "Size", fontSize)
     if fontSizeSupported then property(e, "FontSize", fontSize) end
     property(e, "Center", centered == true)
     property(e, "Font", isBold and BOLD or FONT)
     property(e, "Color", color3(rgb))
     property(e, "ZIndex", z or 15)
-    property(e, "Transparency", clamp(opacity or 1, 0, 1))
+    property(e, "Transparency", CALIBRATION.ALPHA_INVERTED and (1 - clamp(opacity or 1, 0, 1)) or clamp(opacity or 1, 0, 1))
     property(e, "Visible", true)
 end
 -- The outlines, circular navigation and custom line icons come from Stance Mono.
@@ -760,16 +785,16 @@ function Stance:CreateWindow(options)
     assert(not self.Destroyed, "Stance UI has been unloaded")
     options = options or {}
     windowSequence = windowSequence + 1
-    local width = options.Size and options.Size[1] or options.Width or 880
-    local height = options.Size and options.Size[2] or options.Height or 620
+    local width = options.Size and options.Size[1] or options.Width or 900
+    local height = options.Size and options.Size[2] or options.Height or 680
     local vw, vh = viewport()
     local w = setmetatable({
         Id = tostring(options.Id or windowSequence),
         Title = pad(options.Title or "Stance UI", 70),
         Subtitle = pad(options.Subtitle or "A minimal, customizable workspace", 140),
-        Width = clamp(tonumber(width) or 880, 700, 2000),
-        Height = clamp(tonumber(height) or 620, 520, 1400),
-        MinWidth = 700, MinHeight = 520,
+        Width = clamp(tonumber(width) or 900, 760, 2000),
+        Height = clamp(tonumber(height) or 680, 600, 1400),
+        MinWidth = 760, MinHeight = 600,
         X = tonumber(options.Position and options.Position[1]) or round((vw - (tonumber(width) or 880)) / 2),
         Y = tonumber(options.Position and options.Position[2]) or round((vh - (tonumber(height) or 620)) / 2),
         Theme = PALETTES[options.Theme] and options.Theme or "Mono",
@@ -999,12 +1024,12 @@ local function paintWindow(window, index)
         end, window, "header")
         return
     end
-    local railX, railY, railW = x + 14, y + 14, 75
+    local railX, railY, railW = x + 14, y + 14, 78
     local railH = h - 28
-    frame(railX, railY, railW, railH, t.line, t.side, 38, z + 2, opacity)
-    local paneX, paneY = x + 101, y + 14
-    local paneW, paneH = w - 115, h - 28
-    frame(paneX, paneY, paneW, paneH, t.line, t.panel, 30, z + 2, opacity)
+    frame(railX, railY, railW, railH, t.line, t.side, railW / 2, z + 2, opacity)
+    local paneX, paneY = x + 102, y + 14
+    local paneW, paneH = w - 116, h - 28
+    frame(paneX, paneY, paneW, paneH, t.line, t.panel, 28, z + 2, opacity)
     -- Circular icon rail: no rectangular row highlights, no alphabet avatars.
     local railCenter = railX + railW / 2
     local regular, lastSettings
@@ -1016,23 +1041,28 @@ local function paintWindow(window, index)
     end
     local function nav(tab, cy)
         local active = window.SelectedTab == tab
-        local hover = hovering(railCenter - 32, cy - 27, 64, 68)
-        local ink = active and t.onAccent or (hover and t.text or t.sub)
-        local edge = active and t.accent or (hover and t.lineHi or t.line)
-        circle(railCenter, cy, 23, edge, z + 5, opacity)
-        circle(railCenter, cy, 21.5, active and t.accent or t.bg, z + 6, opacity)
-        icon(defaultIcon(tab), railCenter, cy, ink, z + 9, active and t.accent or t.bg)
-        drawText(fitted(tab.Name, railW - 2, 10), railCenter, cy + 35, 10,
+        local hover = hovering(railCenter - 32, cy - 26, 64, 66)
+        if active then
+            circle(railCenter, cy, 28, t.text, z + 5, opacity)
+            circle(railCenter, cy, 27, t.bg, z + 6, opacity)
+            circle(railCenter, cy, 22, t.text, z + 7, opacity)
+            icon(defaultIcon(tab), railCenter, cy, t.bg, z + 9, t.text)
+        else
+            circle(railCenter, cy, 22, hover and t.lineHi or t.line, z + 5, opacity)
+            circle(railCenter, cy, 21, hover and t.control or t.bg, z + 6, opacity)
+            icon(defaultIcon(tab), railCenter, cy, hover and t.text or t.sub, z + 9, t.bg)
+        end
+        drawText(fitted(tab.Name, railW - 2, 11), railCenter, cy + 36, 11,
             active and t.text or t.mute, z + 8, false, true)
-        region(railCenter - 32, cy - 27, 64, 66, function() window:SelectTab(tab) end, window, "tab")
+        region(railCenter - 32, cy - 26, 64, 66, function() window:SelectTab(tab) end, window, "tab")
     end
-    local firstNav, spacing = railY + 53, 70
+    local firstNav, spacing = y + 66, 72
     local lastRegular = railY + railH - 120
     for i, tab in ipairs(regular) do
         local cy = firstNav + (i-1) * spacing
         if cy <= lastRegular then nav(tab, cy) end
     end
-    if lastSettings then nav(lastSettings, railY + railH - 54) end
+    if lastSettings then nav(lastSettings, y + h - 72) end
     -- Upper bar. Content intentionally has open black space, like the original Stance UI.
     local cx, cw = paneX + 26, paneW - 52
     drawText("S T A N C E", cx, paneY + 31, 11, t.text, z + 8, true)
@@ -1098,11 +1128,11 @@ local function paintWindow(window, index)
     local tab = window.SelectedTab
     local title = tab and tab.Name or window.Title
     if title:lower() == "home" then title = window.HomeTitle or "Your workspace" end
-    drawText(fitted(title, cw - 32, 24), cx, paneY + 106, 24, t.text, z + 8, true)
+    drawText(fitted(title, cw - 32, 34), cx, y + 112, 34, t.text, z + 8)
     local desc = tab and tab.Description ~= "" and tab.Description or window.Subtitle
-    drawText(fitted(desc, cw - 20, 12), cx, paneY + 135, 12, t.mute, z + 8)
-    local listTop = paneY + 166
-    local listBottom = paneY + paneH - 83
+    drawText(fitted(desc, cw - 20, 12), cx, y + 146, 12, t.mute, z + 8)
+    local listTop = y + 176
+    local listBottom = y + h - 110
     if tab then
         if #tab.Cards > 0 then
             local gap, count = 12, math.min(3, #tab.Cards)
@@ -1360,15 +1390,72 @@ local function bringForward(window)
         end
     end
 end
+local function translateVisible(dx, dy)
+    if dx == 0 and dy == 0 then return true end
+    -- Translation is safe when a single window owns the canvas and there are no fixed-screen overlays.
+    if #Stance.Windows ~= 1 or Engine.popup or #Engine.toasts > 0 or Engine.focus then return false end
+    local pool = Engine.pools
+    for i = 1, Engine.used.Square do
+        local e = pool.Square[i]
+        if e and e.Visible ~= false and e.px and e.py then
+            e.px, e.py = e.px + dx, e.py + dy
+            property(e, "Position", Vector2.new(e.px, e.py))
+        end
+    end
+    for i = 1, Engine.used.Text do
+        local e = pool.Text[i]
+        if e and e.Visible ~= false and e.px and e.py then
+            e.px, e.py = e.px + dx, e.py + dy
+            property(e, "Position", Vector2.new(e.px, e.py))
+        end
+    end
+    for i = 1, Engine.used.Line do
+        local e = pool.Line[i]
+        if e and e.Visible ~= false and e.ax then
+            e.ax, e.ay, e.bx, e.by = e.ax + dx, e.ay + dy, e.bx + dx, e.by + dy
+            property(e, "From", Vector2.new(e.ax, e.ay))
+            property(e, "To", Vector2.new(e.bx, e.by))
+        end
+    end
+    for i = 1, Engine.used.Triangle do
+        local e = pool.Triangle[i]
+        if e and e.Visible ~= false and e.ax then
+            e.ax, e.ay, e.bx, e.by = e.ax + dx, e.ay + dy, e.bx + dx, e.by + dy
+            e.cx, e.cy = e.cx + dx, e.cy + dy
+            property(e, "PointA", Vector2.new(e.ax, e.ay))
+            property(e, "PointB", Vector2.new(e.bx, e.by))
+            property(e, "PointC", Vector2.new(e.cx, e.cy))
+        end
+    end
+    for _, r in ipairs(Engine.regions) do
+        -- Fixed-screen input surfaces are not part of the movable window.
+        r.x, r.y = r.x + dx, r.y + dy
+    end
+    return true
+end
 local function applyDrag()
     local d = Engine.drag
     if not d or d.window.Destroyed then Engine.drag = nil; return end
     local w = d.window
     if d.kind == "window" then
         local vw, vh = viewport()
+        local oldX, oldY = w.X, w.Y
         w.X = clamp(round(Engine.mouseX - d.dx), -w.Width + 120, vw - 120)
         w.Y = clamp(round(Engine.mouseY - d.dy), 0, vh - 66)
-        w:_changed()
+        local dx, dy = w.X - oldX, w.Y - oldY
+        if dx ~= 0 or dy ~= 0 then
+            Engine.dragMoved = true
+            -- Equivalent to the source's 120Hz translation fast path.
+            if clock() - Engine.lastDragPaint >= 1/120 and translateVisible(dx, dy) then
+                Engine.lastDragPaint = clock()
+                Engine.dirty = false
+            else
+                markedDirty()
+            end
+            -- Persist after release, not for every mouse movement.
+            w._dirty = w.AutoSave
+            w._saveAt = now() + 0.65
+        end
     elseif d.kind == "resize" then
         w.Width = clamp(round(d.w + Engine.mouseX - d.ox), w.MinWidth, 2000)
         w.Height = clamp(round(d.h + Engine.mouseY - d.oy), w.MinHeight, 1400)
@@ -1527,12 +1614,32 @@ local function handleClick()
     end
     markedDirty()
 end
+local function sinkTypingKeys(enabled)
+    if not enabled then
+        if Engine.casBound then
+            pcall(function() game:GetService("ContextActionService"):UnbindAction(Engine.casName) end)
+            Engine.casBound = false
+        end
+        Engine.casRetryAt = 0
+        return
+    end
+    if Engine.casBound or now() < Engine.casRetryAt then return end
+    Engine.casRetryAt = now() + 0.6
+    local ok = pcall(function()
+        local cas = game:GetService("ContextActionService")
+        local K = Enum.KeyCode
+        cas:BindActionAtPriority(Engine.casName, function() return Enum.ContextActionResult.Sink end,
+            false, 1000000, K.W, K.A, K.S, K.D, K.Space, K.Up, K.Down, K.Left, K.Right)
+    end)
+    Engine.casBound = ok
+end
 local function captureGameInput()
     local hovered = false
     for _, w in ipairs(Stance.Windows) do
         if w.Visible and hovering(w.X, w.Y, w.Width, w.Minimized and 74 or w.Height) then hovered = true; break end
     end
     local shouldBlock = hovered or Engine.focus ~= nil or Engine.capture ~= nil or Engine.popup ~= nil
+    sinkTypingKeys(Engine.focus ~= nil or Engine.capture ~= nil)
     if shouldBlock == Engine.blocked then return end
     if type(setrobloxinput) == "function" then
         local ok = pcall(setrobloxinput, not shouldBlock)
@@ -1549,8 +1656,13 @@ local function update(dt)
     local down = mouseDown() and activeRoblox()
     local clicked = down and not Engine.lastDown
     if clicked then handleClick() end
+    local wasDragging = Engine.drag ~= nil
     if Engine.drag then
-        if down then applyDrag() else Engine.drag = nil end
+        if down then applyDrag() else
+            Engine.drag = nil
+            if Engine.dragMoved then markedDirty() end
+            Engine.dragMoved = false
+        end
     end
     Engine.lastDown = down
     if Engine.capture then handleCapture() else handleText(dt) end
@@ -1573,16 +1685,35 @@ local function update(dt)
     if Engine.dirty or clock() - Engine.lastPaint >= interval then render() end
 end
 
+local Scheduler
 function Stance:GetStats()
     return {
         windows = #self.Windows,
         squares = #Engine.pools.Square,
         texts = #Engine.pools.Text,
         lines = #Engine.pools.Line,
+        triangles = #Engine.pools.Triangle,
         visible = (function() local n = 0; for _, w in ipairs(self.Windows) do if w.Visible then n = n + 1 end end; return n end)(),
         inputBlocked = Engine.blocked == true,
         version = VERSION,
+        scheduler = Scheduler.active, schedulerChanges = Scheduler.changes,
+        renderSteppedHz = Scheduler.rates.RenderStepped,
+        heartbeatHz = Scheduler.rates.Heartbeat,
+        taskHz = Scheduler.rates.Task,
     }
+end
+function Stance:Calibrate(options)
+    if type(options) ~= "table" then return false end
+    for _, key in ipairs({"CENTER_BOTH_AXES", "TEXT_DY", "ALPHA_INVERTED", "CHAR_W"}) do
+        if options[key] ~= nil then
+            if key == "CENTER_BOTH_AXES" or key == "ALPHA_INVERTED" then
+                if type(options[key]) ~= "boolean" then return false end
+            elseif type(options[key]) ~= "number" then return false end
+            CALIBRATION[key] = options[key]
+        end
+    end
+    markedDirty()
+    return true
 end
 function Stance:Render() render() end
 function Stance:Step(dt) update(tonumber(dt) or 1/60) end
@@ -1600,12 +1731,13 @@ function Stance:Unload()
     for _, pool in pairs(Engine.pools) do
         for _, entry in ipairs(pool) do pcall(function() entry.obj:Remove() end) end
     end
-    Engine.pools = { Square = {}, Text = {}, Line = {} }
-    Engine.used = { Square = 0, Text = 0, Line = 0 }
+    Engine.pools = { Square = {}, Text = {}, Line = {}, Triangle = {} }
+    Engine.used = { Square = 0, Text = 0, Line = 0, Triangle = 0 }
     Engine.regions = {}
     Engine.focus, Engine.capture, Engine.popup, Engine.drag = nil, nil, nil, nil
     if type(setrobloxinput) == "function" then pcall(setrobloxinput, true) end
     Engine.blocked = false
+    sinkTypingKeys(false)
     if type(_G) == "table" then
         if _G.StanceUIUnload == self._unloadFn then _G.StanceUIUnload = nil end
         if _G.StanceUI == self then _G.StanceUI = nil end
@@ -1613,21 +1745,68 @@ function Stance:Unload()
 end
 Stance.Destroy = Stance.Unload
 
+-- Adapted from Stance_v4_Mono_UI_Only.lua: choose the fastest reliable
+-- frame callback, then rate-limit actual UI updates to 120 Hz.
+Scheduler = {
+    active = "RenderStepped", lastWindow = clock(), lastStep = clock(),
+    counts = {RenderStepped=0, Heartbeat=0, Task=0},
+    rates = {RenderStepped=0, Heartbeat=0, Task=0},
+    changes = 0,
+}
+local function schedulerTick(name, fallbackDt)
+    if not Engine.alive then return end
+    local time = clock()
+    Scheduler.counts[name] = Scheduler.counts[name] + 1
+    local elapsed = time - Scheduler.lastWindow
+    if elapsed >= 1 then
+        local best, bestRate = Scheduler.active, 0
+        for kind, count in pairs(Scheduler.counts) do
+            local rate = count / elapsed
+            Scheduler.rates[kind] = rate
+            Scheduler.counts[kind] = 0
+            if rate > bestRate then best, bestRate = kind, rate end
+        end
+        -- Match original's high-rate preference order.
+        if Scheduler.rates.RenderStepped >= 115 then best = "RenderStepped"
+        elseif Scheduler.rates.Task >= 115 then best = "Task"
+        elseif Scheduler.rates.Heartbeat >= 115 then best = "Heartbeat" end
+        if best ~= Scheduler.active then
+            Scheduler.active = best
+            Scheduler.changes = Scheduler.changes + 1
+        end
+        Scheduler.lastWindow = time
+    end
+    if name ~= Scheduler.active or time - Scheduler.lastStep < 1/120 then return end
+    local dt = math.min(time - Scheduler.lastStep, 0.25)
+    Scheduler.lastStep = time
+    local worked, err = pcall(update, dt > 0 and dt or fallbackDt or 1/60)
+    if not worked and type(warn) == "function" then warn("[Stance UI] Update: " .. tostring(err)) end
+end
 local function connectRunService()
     local ok, runService = pcall(function() return game:GetService("RunService") end)
-    local loopConnected = false
+    local signalCount = 0
     if ok and runService then
-        local okConnection, connection = pcall(function()
-            return runService.RenderStepped:Connect(function(dt)
-                if not Engine.alive then return end
-                local t = clock()
-                if t - Engine.lastStep < 1 / 120 then return end
-                Engine.lastStep = t
-                local worked, err = pcall(update, math.min(dt or 1/60, 0.25))
-                if not worked and type(warn) == "function" then warn("[Stance UI] Update: " .. tostring(err)) end
-            end)
+        for _, kind in ipairs({"RenderStepped", "Heartbeat"}) do
+            local signal = runService[kind]
+            if signal then
+                local okConnection, connection = pcall(function()
+                    return signal:Connect(function(dt) schedulerTick(kind, dt) end)
+                end)
+                if okConnection and connection then
+                    Engine.connections[#Engine.connections+1] = connection
+                    signalCount = signalCount + 1
+                    if signalCount == 1 then Scheduler.active = kind end
+                end
+            end
+        end
+    end
+    if type(task) == "table" and type(task.spawn) == "function" and type(task.wait) == "function" then
+        task.spawn(function()
+            while Engine.alive do
+                task.wait(1/240)
+                if Engine.alive then schedulerTick("Task", 1/240) end
+            end
         end)
-        if okConnection and connection then Engine.connections[#Engine.connections + 1] = connection; loopConnected = true end
     end
     local okInput, inputService = pcall(function() return game:GetService("UserInputService") end)
     if okInput and inputService then
@@ -1639,14 +1818,6 @@ local function connectRunService()
             end)
         end)
         if okConnection and connection then Engine.connections[#Engine.connections + 1] = connection end
-    end
-    if not loopConnected and type(task) == "table" and type(task.spawn) == "function" then
-        task.spawn(function()
-            while Engine.alive do
-                pcall(update, 1/60)
-                task.wait(1/60)
-            end
-        end)
     end
 end
 Stance._unloadFn = function() Stance:Unload() end

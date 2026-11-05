@@ -1,4 +1,4 @@
-# Stance UI API — v0.2.0
+# Stance UI API — v0.3.0
 
 The API is intentionally declarative. Create windows, then tabs, then sections, then controls. Tab-level `Create*` methods automatically create an implicit `General` section.
 
@@ -115,7 +115,7 @@ Section:CreateTextbox({Name="Display name", Flag="name", Default="", MaxLength=4
 -- Alias: CreateInput
 ```
 
-Typing is handled with polled keyboard virtual key codes. Escape blurs the field; Enter blurs and fires `OnSubmit`. The v0.2.0 keyboard layout is **US QWERTY**; non-US layouts and IME composition are not supported.
+Typing is handled with polled keyboard virtual key codes. Escape blurs the field; Enter blurs and fires `OnSubmit`. The v0.3.0 keyboard layout is **US QWERTY**; non-US layouts and IME composition are not supported.
 
 ### Keybind
 
@@ -178,7 +178,7 @@ The renderer is intentionally based on Matcha's known `Drawing` primitives (`Squ
 
 The project has passed a local mocked-runtime smoke test, but it has **not** yet been visually verified inside Matcha. The Drawing implementation has no built-in clipping; partially visible rows are culled during scrolling instead of being pixel-clipped. Native touch/controller navigation, IME composition, font measurement, and screen-reader semantics are not supported. On platforms that don't forward `UserInputService.InputChanged`, use the scroll buttons or Page Up/Page Down.
 
-## Original Stance Mono layout (v0.2.0)
+## Original Stance Mono layout (v0.3.0)
 
 The default `Mono` theme has the same black/white palette and circular icon rail as the Matcha Animation Changer's Mono UI. Standard icon names: `home`, `list`, `star`, `layers`, `bookmark`, `keys`, and `sliders`. When `Icon` is omitted or a one-letter abbreviation, the library chooses an icon from the tab name; other names fall back to an initial. The final `Settings` / `Appearance` tab is pinned to the bottom of the rail.
 
@@ -195,3 +195,18 @@ Window:CreateFooterButton({Name="Apply",Style="primary",Width=112,Callback=funct
 ```
 
 Maximum three dashboard cards per tab. `CreateFooterButton` styles are `soft`, `primary`, `ghost`, and `danger`, and actions are aligned right. The top-right Search control matches tab names and control names, selecting the matching destination.
+
+## Matcha rendering calibration
+
+The original Stance v4 Mono UI-only source uses `CENTER_BOTH_AXES = true`, `TEXT_DY = 0`, `ALPHA_INVERTED = false`, and `CHAR_W = 0.54`. These values are reproduced by default. To adjust for an executor with different text anchoring or alpha semantics:
+
+```lua
+Stance:Calibrate({
+    CENTER_BOTH_AXES = true,
+    TEXT_DY = 0,
+    ALPHA_INVERTED = false,
+    CHAR_W = 0.54,
+})
+```
+
+The library uses the actual Stance v4 pill/card/icon geometry and maintains pooled drawing objects. The host app supplies content through normal reusable sections and controls; **no animation catalog or animation engine is loaded**.

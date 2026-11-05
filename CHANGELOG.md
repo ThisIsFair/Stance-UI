@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — original Stance v4 UI-only source integration
+
+- Rebased Mono palette and exact shell/sidebar/icon geometry on the author-supplied UI-only Lua source instead of approximating screenshots.
+- Restored the source's Matcha text anchoring with calibration options and extra Triangle pooling.
+- Added single-window fast-path drawing translation during dragging, plus buffered configuration saves.
+- Integrated original hover/typing input-capture approach with optional ContextActionService movement sinking.
+- Kept the generic window/tab/control API, with no animation catalog, data or playback dependency.
+- Rechecked mock-runtime smoke tests and updated geometric snapshot.
+
+
 ## 0.2.0 — Stance Mono visual alignment
 
 - Rebuilt Mono around the original Matcha Animation Changer aesthetics instead of generic dark rectangular sidebars.
