@@ -1,4 +1,4 @@
--- Stance UI 0.1.0 | Standalone Matcha Drawing API library
+-- Stance UI 0.2.0 | Reusable Matcha UI with the original Stance Mono design
 -- No external project dependencies. Designed for the Matcha executor runtime.
 
 assert(type(Drawing) == "table" and type(Drawing.new) == "function", "Stance UI requires Matcha Drawing.new")
@@ -9,7 +9,7 @@ if type(_G) == "table" and type(_G.StanceUIUnload) == "function" then
     pcall(_G.StanceUIUnload)
 end
 
-local VERSION = "0.1.0"
+local VERSION = "0.2.0"
 local Stance = { Version = VERSION, Windows = {}, Flags = {}, Destroyed = false }
 local Engine = {
     pools = { Square = {}, Text = {}, Line = {} },
@@ -46,24 +46,25 @@ local function blend(a, b, t)
     return { round(a[1] + (b[1] - a[1]) * t), round(a[2] + (b[2] - a[2]) * t), round(a[3] + (b[3] - a[3]) * t) }
 end
 local PALETTES = {
+    -- Matcha Animation Changer / Stance Mono colors. No gradient, no filled gray cards.
     Mono = {
-        bg = {12, 12, 14}, side = {17, 17, 19}, panel = {22, 22, 25}, card = {27, 27, 30},
-        hover = {39, 39, 43}, control = {34, 34, 38}, line = {45, 45, 49},
-        text = {234, 234, 237}, sub = {159, 159, 169}, mute = {99, 99, 108}, accent = {234, 234, 237},
+        bg = {0, 0, 0}, side = {0, 0, 0}, panel = {0, 0, 0}, card = {0, 0, 0},
+        hover = {20, 20, 20}, control = {20, 20, 20}, line = {44, 44, 44},
+        text = {244, 244, 244}, sub = {158, 158, 158}, mute = {98, 98, 98}, accent = {255, 255, 255},
     },
     Purple = {
-        bg = {14, 10, 22}, side = {20, 14, 31}, panel = {25, 18, 38}, card = {32, 24, 46},
-        hover = {46, 36, 64}, control = {39, 30, 54}, line = {54, 45, 79},
+        bg = {14, 11, 22}, side = {19, 15, 31}, panel = {25, 20, 40}, card = {25, 20, 40},
+        hover = {37, 30, 60}, control = {37, 30, 60}, line = {54, 45, 84},
         text = {236, 232, 248}, sub = {166, 156, 196}, mute = {104, 96, 134}, accent = {139, 92, 246},
     },
     Dark = {
-        bg = {13, 13, 14}, side = {19, 19, 21}, panel = {24, 24, 27}, card = {29, 29, 33},
-        hover = {46, 46, 52}, control = {37, 37, 41}, line = {46, 46, 52},
+        bg = {13, 13, 14}, side = {19, 19, 21}, panel = {25, 25, 28}, card = {25, 25, 28},
+        hover = {49, 49, 55}, control = {37, 37, 41}, line = {46, 46, 52},
         text = {232, 232, 236}, sub = {152, 152, 162}, mute = {92, 92, 102}, accent = {96, 156, 248},
     },
     Midnight = {
-        bg = {8, 11, 20}, side = {12, 16, 29}, panel = {15, 20, 34}, card = {19, 25, 41},
-        hover = {33, 43, 70}, control = {27, 35, 58}, line = {36, 46, 70},
+        bg = {8, 11, 20}, side = {12, 16, 29}, panel = {17, 22, 38}, card = {17, 22, 38},
+        hover = {37, 47, 76}, control = {27, 35, 58}, line = {36, 46, 70},
         text = {218, 230, 242}, sub = {132, 150, 172}, mute = {70, 86, 110}, accent = {45, 190, 220},
     },
 }
@@ -150,6 +151,60 @@ local function drawText(str, x, cy, size, rgb, z, isBold, centered, opacity)
     property(e, "ZIndex", z or 15)
     property(e, "Transparency", clamp(opacity or 1, 0, 1))
     property(e, "Visible", true)
+end
+-- The outlines, circular navigation and custom line icons come from Stance Mono.
+local function circle(cx, cy, radius, rgb, z, opacity)
+    rect(cx - radius, cy - radius, radius * 2, radius * 2, rgb, radius, z, opacity)
+end
+local function frame(x, y, w, h, borderColor, innerColor, radius, z, opacity)
+    rect(x, y, w, h, borderColor, radius, z, opacity)
+    rect(x + 1, y + 1, math.max(1, w - 2), math.max(1, h - 2), innerColor, math.max(0, radius - 1), z + 1, opacity)
+end
+local function icon(name, cx, cy, ink, z, inner)
+    name = tostring(name or ""):lower()
+    local function ln(x1, y1, x2, y2) line(cx + x1, cy + y1, cx + x2, cy + y2, ink, z, 1.6) end
+    local function dot(x, y, radius) circle(cx + x, cy + y, radius, ink, z) end
+    if name == "home" then
+        ln(-9,0,0,-9); ln(0,-9,9,0); ln(-6,-3,-6,8); ln(6,-3,6,8); ln(-6,8,6,8)
+        ln(-2,8,-2,3); ln(2,8,2,3); ln(-2,3,2,3)
+    elseif name == "list" or name == "browse" or name == "components" then
+        for _, yy in ipairs({-6,0,6}) do ln(-3,yy,9,yy); dot(-8,yy,1.6) end
+    elseif name == "star" or name == "favorites" then
+        local pts = {}
+        for j=0,9 do
+            local rad=(j % 2 == 0) and 10 or 4.3
+            local a=-math.pi/2 + j*math.pi/5
+            pts[#pts+1]={rad*math.cos(a), rad*math.sin(a)+1}
+        end
+        for j=1,10 do local a,b=pts[j],pts[j%10+1]; ln(a[1],a[2],b[1],b[2]) end
+    elseif name == "layers" or name == "mix" then
+        ln(0,-10,10,-5); ln(10,-5,0,0); ln(0,0,-10,-5); ln(-10,-5,0,-10)
+        ln(-10,0,0,5); ln(0,5,10,0); ln(-10,5,0,10); ln(0,10,10,5)
+    elseif name == "bookmark" or name == "presets" then
+        ln(-6,-9,6,-9); ln(-6,-9,-6,9); ln(6,-9,6,9); ln(-6,9,0,4); ln(0,4,6,9)
+    elseif name == "keys" or name == "controls" then
+        ln(-10,-6,10,-6); ln(10,-6,10,6); ln(10,6,-10,6); ln(-10,6,-10,-6)
+        dot(-5,-2,1.3);dot(0,-2,1.3);dot(5,-2,1.3);ln(-5,3,5,3)
+    elseif name == "sliders" or name == "appearance" or name == "settings" then
+        ln(-10,-4,10,-4);ln(-10,4,10,4)
+        circle(cx-3,cy-4,3.6,ink,z);circle(cx-3,cy-4,2,inner or {0,0,0},z+1)
+        circle(cx+4,cy+4,3.6,ink,z);circle(cx+4,cy+4,2,inner or {0,0,0},z+1)
+    elseif name == "close" then
+        ln(-5,-5,5,5);ln(-5,5,5,-5)
+    elseif name == "search" then
+        circle(cx-2,cy-2,7,ink,z);circle(cx-2,cy-2,5,inner or {0,0,0},z+1)
+        ln(3,3,10,10)
+    elseif name == "minus" then ln(-5,0,5,0)
+    elseif name == "plus" then ln(-5,0,5,0);ln(0,-5,0,5)
+    else
+        drawText(tostring(name):sub(1,1):upper(), cx, cy, 16, ink, z+2, true, true)
+    end
+end
+local function defaultIcon(tab)
+    local name=tostring(tab.Name or ""):lower()
+    local assigned=tostring(tab.Icon or ""):lower()
+    if assigned == "" or #assigned == 1 then return name end
+    return assigned
 end
 local function beginFrame()
     for kind in pairs(Engine.used) do Engine.used[kind] = 0 end
@@ -262,6 +317,7 @@ local function themeOf(window)
     local light = 0.299 * t.accent[1] + 0.587 * t.accent[2] + 0.114 * t.accent[3]
     t.onAccent = light > 148 and {11, 11, 14} or {255, 255, 255}
     t.accentDark = blend(t.card, t.accent, 0.18)
+    t.lineHi = blend(t.line, t.text, 0.25)
     t.good, t.warn, t.bad = GOOD, WARN, BAD
     return t
 end
@@ -373,6 +429,7 @@ end
 function WindowMethods:SetVisible(visible)
     self.Visible = not not visible
     if not self.Visible then
+        self._searching = false
         if Engine.focus and Engine.focus.window == self then Engine.focus = nil end
         if Engine.capture and Engine.capture.window == self then Engine.capture = nil end
         if Engine.popup and Engine.popup.window == self then Engine.popup = nil end
@@ -380,6 +437,24 @@ function WindowMethods:SetVisible(visible)
     markedDirty()
 end
 function WindowMethods:Toggle() self:SetVisible(not self.Visible) end
+function WindowMethods:SetFooter(text) self.Footer = pad(text,120); markedDirty() end
+function WindowMethods:SetStatus(text, isGood)
+    self.Status = pad(text,35)
+    self.StatusGood = isGood ~= false
+    markedDirty()
+end
+function WindowMethods:CreateFooterButton(options)
+    options = options or {}
+    local button = {
+        Name = pad(options.Name or "Action", 26),
+        Style = (options.Style == "primary" or options.Style == "ghost" or options.Style == "danger") and options.Style or "soft",
+        Width = clamp(tonumber(options.Width) or 100, 45, 180),
+        Callback = options.Callback,
+    }
+    self.FooterActions[#self.FooterActions+1] = button
+    markedDirty()
+    return button
+end
 function WindowMethods:Minimize(value)
     if value == nil then value = not self.Minimized end
     self.Minimized = not not value
@@ -393,6 +468,7 @@ function WindowMethods:SelectTab(tab)
     end
     if type(tab) ~= "table" or tab.Window ~= self then return false end
     self.SelectedTab = tab
+    self._searching = false
     Engine.popup = nil
     if Engine.focus and Engine.focus.window == self then Engine.focus = nil end
     self:_changed()
@@ -442,7 +518,7 @@ function WindowMethods:CreateTab(options)
     options = options or {}
     local tab = setmetatable({
         Window = self, Name = pad(options.Name or "Tab " .. (#self.Tabs + 1), 40),
-        Icon = pad(options.Icon or "", 3), Sections = {}, Scroll = 0, MaxScroll = 0,
+        Icon = pad(options.Icon or "", 20), Sections = {}, Cards = {}, Scroll = 0, MaxScroll = 0,
         Description = pad(options.Description or "", 140),
         _implicitSection = nil,
     }, TabMethods)
@@ -450,6 +526,22 @@ function WindowMethods:CreateTab(options)
     if not self.SelectedTab or tab.Name == self._savedTab then self.SelectedTab = tab end
     markedDirty()
     return tab
+end
+function TabMethods:CreateCard(options)
+    options = options or {}
+    local card = {
+        Number = pad(options.Number or string.format("%02d", #self.Cards + 1), 6),
+        Name = pad(options.Name or options.Title or "Card", 36),
+        Kicker = pad(options.Kicker or "", 80),
+        Value = pad(options.Value or "", 80),
+        Description = pad(options.Description or "", 100),
+        Button = pad(options.Button or "Open", 32),
+        Callback = options.Callback,
+    }
+    assert(#self.Cards < 3, "Stance UI displays at most three dashboard cards per tab")
+    self.Cards[#self.Cards + 1] = card
+    markedDirty()
+    return card
 end
 function TabMethods:CreateSection(options)
     if type(options) == "string" then options = { Name = options } end
@@ -689,7 +781,11 @@ function Stance:CreateWindow(options)
         AutoSave = options.AutoSave ~= false,
         ConfigFile = tostring(options.ConfigFile or ("stance_ui_" .. sanitizeFileName(options.Title) .. ".json")),
         _saved = {}, _savedTab = nil, _dirty = false, _saveAt = 0,
-        _modal = nil, Destroyed = false,
+        Footer = pad(options.Footer or "", 120),
+        FooterActions = {}, Status = pad(options.Status or "", 35), StatusGood = true,
+        HomeTitle = pad(options.HomeTitle or "Your workspace", 70),
+        Searchable = options.Searchable ~= false,
+        _searching = false, _searchQuery = "", _modal = nil, Destroyed = false,
     }, WindowMethods)
     loadConfig(w)
     self.Windows[#self.Windows + 1] = w
@@ -730,20 +826,32 @@ local function controlHeight(c)
 end
 local function drawButton(x, y, w, h, label, style, theme, z, action, owner, disabled)
     local hover = not disabled and hovering(x, y, w, h)
-    local bg = (style == "primary" and theme.accent)
-        or (style == "danger" and blend(theme.card, theme.bad, hover and 0.32 or 0.19))
-        or (hover and theme.hover or theme.control)
-    rect(x, y, w, h, bg, 12, z, owner.Opacity)
-    local foreground = style == "primary" and theme.onAccent or (disabled and theme.mute or theme.text)
-    drawText(fitted(label, w - 14, 13), x + w / 2, y + h / 2, 13, foreground, z + 2, true, true)
+    local foreground = disabled and theme.mute or theme.text
+    local opacity = owner.Opacity
+    if style == "primary" then
+        rect(x, y, w, h, disabled and theme.control or (hover and blend(theme.accent, {255,255,255},0.13) or theme.accent), h/2, z, opacity)
+        foreground = disabled and theme.mute or theme.onAccent
+    elseif style == "danger" then
+        frame(x, y, w, h, hover and theme.bad or theme.line, theme.card, h/2, z, opacity)
+        foreground = disabled and theme.mute or theme.bad
+    elseif style == "ghost" then
+        if hover then frame(x,y,w,h,theme.lineHi,theme.card,h/2,z,opacity) end
+        foreground = disabled and theme.mute or theme.sub
+    else
+        frame(x, y, w, h, hover and theme.lineHi or theme.line,
+            hover and theme.control or theme.card, h/2, z, opacity)
+    end
+    drawText(fitted(label, w - 14, 13), x + w / 2, y + h / 2, 13, foreground, z + 3, true, true)
     if not disabled and action then region(x, y, w, h, action, owner, "button") end
 end
+
 local function paintControl(c, x, y, w, h, theme, z)
     local window = c.Window
     local opacity = window.Opacity
     local disabled = c.Disabled
     local hover = hovering(x, y, w, h)
-    rect(x, y, w, h, hover and not disabled and theme.hover or theme.card, 14, z, opacity)
+    frame(x, y, w, h, hover and not disabled and theme.lineHi or theme.line,
+        hover and not disabled and theme.hover or theme.card, 18, z, opacity)
     local labelWidth = math.max(120, w * 0.48)
     local labelX = x + 16
     local fg = disabled and theme.mute or theme.text
@@ -822,14 +930,15 @@ local function paintControl(c, x, y, w, h, theme, z)
     if hasDescription then drawText(fitted(c.Description, labelWidth - 22, 11), labelX, center + 12, 11, theme.mute, z + 2) end
     if c.Kind == "Toggle" then
         local tx, ty = x + w - 67, center - 13
-        rect(tx, ty, 46, 26, c.Value and theme.accent or theme.line, 13, z + 2, opacity)
+        frame(tx, ty, 46, 26, c.Value and theme.accent or theme.line,
+            c.Value and theme.accent or theme.control, 13, z + 2, opacity)
         local thumb = c.Value and tx + 25 or tx + 4
         rect(thumb, ty + 4, 18, 18, c.Value and theme.onAccent or theme.sub, 9, z + 3, opacity)
         if not disabled then region(x, y, w, h, function() c:Set(not c.Value) end, window, "toggle") end
     elseif c.Kind == "Dropdown" then
         local bx, bw, bh = x + w - math.min(250, math.max(145, w * 0.47)), math.min(250, math.max(145, w * 0.47)), 34
         local by = center - bh / 2
-        rect(bx, by, bw, bh, theme.control, 10, z + 2, opacity)
+        frame(bx, by, bw, bh, theme.line, theme.card, bh/2, z + 2, opacity)
         local valueText = tostring(c.Value or "Select...")
         if c.Multiple then
             local labels = {}
@@ -852,8 +961,7 @@ local function paintControl(c, x, y, w, h, theme, z)
         local bw = math.min(300, math.max(175, w * 0.51))
         local bx, by = x + w - bw - 14, center - 18
         local focused = Engine.focus and Engine.focus.control == c
-        rect(bx - 1, by - 1, bw + 2, 38, focused and theme.accent or theme.line, 10, z + 2, opacity)
-        rect(bx, by, bw, 36, theme.control, 9, z + 3, opacity)
+        frame(bx, by, bw, 36, focused and theme.accent or theme.line, theme.card, 18, z + 2, opacity)
         local str = c.Value ~= "" and c.Value or c.Placeholder
         local col = c.Value ~= "" and theme.text or theme.mute
         if focused then str = str .. "|" end
@@ -874,109 +982,215 @@ end
 
 local function paintWindow(window, index)
     if not window.Visible then return end
-    local theme = themeOf(window)
+    local t = themeOf(window)
     local z = index * 100
     local x, y, w, h = window.X, window.Y, window.Width, window.Height
     local opacity = window.Opacity
-    local bodyH = window.Minimized and 74 or h
-    rect(x, y, w, bodyH, theme.bg, 24, z + 1, opacity)
-    rect(x + 10, y + 10, w - 20, bodyH - 20, theme.panel, 20, z + 2, opacity)
-    rect(x + 10, y + 10, w - 20, 62, theme.panel, 19, z + 3, opacity)
-    drawText("S T A N C E   /   U I", x + 27, y + 31, 12, theme.sub, z + 8, true)
-    drawText(fitted(window.Title, w - 390, 14), x + 27, y + 53, 14, theme.text, z + 8, true)
-    region(x + 12, y + 12, w - 134, 60, function()
-        Engine.drag = { kind = "window", window = window, dx = Engine.mouseX - x, dy = Engine.mouseY - y }
-    end, window, "header")
-    local closeX = x + w - 51
-    drawButton(closeX, y + 25, 27, 27, "x", "soft", theme, z + 6,
-        function() window:SetVisible(false) end, window)
-    drawButton(closeX - 34, y + 25, 27, 27, window.Minimized and "+" or "-", "soft", theme, z + 6,
-        function() window:Minimize() end, window)
-    if window.Minimized then return end
-    local sideX, sideY, sideW, sideH = x + 10, y + 82, 154, h - 92
-    rect(sideX, sideY, sideW, sideH, theme.side, 18, z + 3, opacity)
-    drawText("WORKSPACE", sideX + 18, sideY + 26, 11, theme.mute, z + 6, true)
-    for i, tab in ipairs(window.Tabs) do
-        local ty = sideY + 48 + (i - 1) * 54
-        if ty + 44 <= sideY + sideH - 16 then
-            local selected = window.SelectedTab == tab
-            local hov = hovering(sideX + 9, ty, sideW - 18, 44)
-            rect(sideX + 9, ty, sideW - 18, 44,
-                selected and theme.accentDark or (hov and theme.hover or theme.side), 12, z + 5, opacity)
-            if selected then rect(sideX + 9, ty + 8, 3, 28, theme.accent, 2, z + 6, opacity) end
-            if tab.Icon ~= "" then
-                rect(sideX + 20, ty + 11, 23, 23, selected and theme.accent or theme.line, 8, z + 6, opacity)
-                drawText(tab.Icon, sideX + 32, ty + 22, 12, selected and theme.onAccent or theme.sub, z + 7, true, true)
-            end
-            drawText(fitted(tab.Name, tab.Icon == "" and sideW - 39 or sideW - 70, 13),
-                sideX + (tab.Icon ~= "" and 53 or 20), ty + 22, 13,
-                selected and theme.text or theme.sub, z + 7, selected)
-            region(sideX + 9, ty, sideW - 18, 44, function() window:SelectTab(tab) end, window, "tab")
-        end
+    local bodyH = window.Minimized and 80 or h
+    -- The black Stance shell. The sidebar and main pane are distinct outlined capsules.
+    rect(x, y, w, bodyH, t.bg, 27, z + 1, opacity)
+    if window.Minimized then
+        drawText("S T A N C E", x + 26, y + 35, 12, t.text, z + 9, true)
+        drawText(fitted(window.Title, w - 180, 13), x + 26, y + 58, 13, t.sub, z + 9)
+        drawButton(x + w - 89, y + 23, 29, 29, "+", "soft", t, z + 9, function() window:Minimize(false) end, window)
+        drawButton(x + w - 52, y + 23, 29, 29, "x", "ghost", t, z + 9, function() window:SetVisible(false) end, window)
+        region(x + 12, y + 10, w - 115, 65, function()
+            Engine.drag = {kind="window", window=window, dx=Engine.mouseX-x, dy=Engine.mouseY-y}
+        end, window, "header")
+        return
     end
-    drawText("v" .. VERSION, sideX + 17, sideY + sideH - 24, 11, theme.mute, z + 6)
-    local cx, cw = x + 181, w - 203
-    local tab = window.SelectedTab
-    drawText(tab and fitted(tab.Name, cw - 145, 23) or "Your workspace", cx + 3, y + 113, 23, theme.text, z + 7, true)
-    local subtitle = tab and (tab.Description ~= "" and tab.Description or window.Subtitle) or window.Subtitle
-    drawText(fitted(subtitle, cw - 25, 12), cx + 4, y + 138, 12, theme.mute, z + 7)
-    local listTop, listBottom = y + 164, y + h - 61
-    rect(cx, listTop, cw, listBottom - listTop, theme.panel, 18, z + 4, opacity)
-    rect(cx, y + h - 49, cw, 31, theme.panel, 10, z + 4, opacity)
-    if tab then
-        local contentX, contentW = cx + 13, cw - 26
-        local contentTop, contentBottom = listTop + 10, listBottom - 10
-        local currentY = contentTop - tab.Scroll
-        local contentHeight = 0
-        for _, section in ipairs(tab.Sections) do
-            local sectionHeight = 43
-            if section.Expanded then
-                for _, c in ipairs(section.Controls) do
-                    if c.Visible and not c.Destroyed then sectionHeight = sectionHeight + controlHeight(c) + 7 end
+    local railX, railY, railW = x + 14, y + 14, 75
+    local railH = h - 28
+    frame(railX, railY, railW, railH, t.line, t.side, 38, z + 2, opacity)
+    local paneX, paneY = x + 101, y + 14
+    local paneW, paneH = w - 115, h - 28
+    frame(paneX, paneY, paneW, paneH, t.line, t.panel, 30, z + 2, opacity)
+    -- Circular icon rail: no rectangular row highlights, no alphabet avatars.
+    local railCenter = railX + railW / 2
+    local regular, lastSettings
+    regular = {}
+    for _, tab in ipairs(window.Tabs) do
+        local lower = tab.Name:lower()
+        if lower == "settings" or lower == "appearance" then lastSettings = tab
+        else regular[#regular+1] = tab end
+    end
+    local function nav(tab, cy)
+        local active = window.SelectedTab == tab
+        local hover = hovering(railCenter - 32, cy - 27, 64, 68)
+        local ink = active and t.onAccent or (hover and t.text or t.sub)
+        local edge = active and t.accent or (hover and t.lineHi or t.line)
+        circle(railCenter, cy, 23, edge, z + 5, opacity)
+        circle(railCenter, cy, 21.5, active and t.accent or t.bg, z + 6, opacity)
+        icon(defaultIcon(tab), railCenter, cy, ink, z + 9, active and t.accent or t.bg)
+        drawText(fitted(tab.Name, railW - 2, 10), railCenter, cy + 35, 10,
+            active and t.text or t.mute, z + 8, false, true)
+        region(railCenter - 32, cy - 27, 64, 66, function() window:SelectTab(tab) end, window, "tab")
+    end
+    local firstNav, spacing = railY + 53, 70
+    local lastRegular = railY + railH - 120
+    for i, tab in ipairs(regular) do
+        local cy = firstNav + (i-1) * spacing
+        if cy <= lastRegular then nav(tab, cy) end
+    end
+    if lastSettings then nav(lastSettings, railY + railH - 54) end
+    -- Upper bar. Content intentionally has open black space, like the original Stance UI.
+    local cx, cw = paneX + 26, paneW - 52
+    drawText("S T A N C E", cx, paneY + 31, 11, t.text, z + 8, true)
+    local closeX = paneX + paneW - 34
+    circle(closeX, paneY + 31, 15, t.line, z + 7, opacity)
+    circle(closeX, paneY + 31, 14, t.bg, z + 8, opacity)
+    icon("close", closeX, paneY + 31, t.text, z + 9)
+    region(closeX - 16, paneY + 15, 32, 32, function() window:SetVisible(false) end, window, "button")
+    local searchW, searchX = 76, closeX - 15 - 76
+    if window.Status ~= "" then
+        local statusW = math.min(140, textWidth(window.Status, 11))
+        local statusX = searchX - statusW - 31
+        circle(statusX, paneY + 31, 3, window.StatusGood and GOOD or t.sub, z + 8, opacity)
+        drawText(window.Status, statusX + 10, paneY + 31, 11, t.sub, z + 8)
+    end
+    if window.Searchable then
+        frame(searchX, paneY + 16, searchW, 30, t.line, t.bg, 15, z + 7, opacity)
+        drawText("Search", searchX + searchW/2, paneY + 31, 12, t.text, z + 9, false, true)
+        region(searchX, paneY + 16, searchW, 30, function()
+            window._searching = not window._searching
+            if window._searching then
+                window._searchQuery = ""
+                local searchControl = {Window = window, Value = "", Destroyed = false}
+                searchControl.Set = function(_, value)
+                    searchControl.Value = tostring(value):sub(1, 60)
+                    window._searchQuery = searchControl.Value
+                    markedDirty()
                 end
-            end
-            sectionHeight = sectionHeight + 10
-            if currentY >= contentTop and currentY + 40 <= contentBottom then
-                rect(contentX, currentY, contentW, 40, theme.control, 11, z + 5, opacity)
-                drawText(fitted(section.Name, contentW - 70, 14), contentX + 15, currentY + 20, 14, theme.text, z + 6, true)
-                drawText(section.Expanded and "-" or "+", contentX + contentW - 22, currentY + 20, 17, theme.sub, z + 6, true, true)
-                region(contentX, currentY, contentW, 40, function() section:SetExpanded(not section.Expanded) end, window, "section")
-            end
-            local ry = currentY + 45
-            if section.Expanded then
-                for _, c in ipairs(section.Controls) do
-                    if c.Visible and not c.Destroyed then
-                        local rh = controlHeight(c)
-                        if ry >= contentTop and ry + rh <= contentBottom then
-                            paintControl(c, contentX, ry, contentW, rh, theme, z + 6)
+                searchControl.OnSubmit = function()
+                    local query = window._searchQuery:lower()
+                    if query ~= "" then
+                        for _, tab in ipairs(window.Tabs) do
+                            if tab.Name:lower():find(query,1,true) then
+                                window:SelectTab(tab)
+                                return
+                            end
+                            for _, section in ipairs(tab.Sections) do
+                                for _, control in ipairs(section.Controls) do
+                                    if control.Name:lower():find(query,1,true) then
+                                        window:SelectTab(tab)
+                                        section:SetExpanded(true)
+                                        tab.Scroll = 0
+                                        return
+                                    end
+                                end
+                            end
                         end
-                        ry = ry + rh + 7
+                    end
+                    window._searching = false
+                    markedDirty()
+                end
+                window._searchControl = searchControl
+                Engine.focus = {control = searchControl, window = window}
+            else
+                Engine.focus = nil
+            end
+            markedDirty()
+        end, window, "button")
+    end
+    region(paneX + 6, paneY + 9, math.max(15, searchX - paneX - 10), 49, function()
+        Engine.drag = {kind="window", window=window, dx=Engine.mouseX-x, dy=Engine.mouseY-y}
+    end, window, "header")
+    local tab = window.SelectedTab
+    local title = tab and tab.Name or window.Title
+    if title:lower() == "home" then title = window.HomeTitle or "Your workspace" end
+    drawText(fitted(title, cw - 32, 24), cx, paneY + 106, 24, t.text, z + 8, true)
+    local desc = tab and tab.Description ~= "" and tab.Description or window.Subtitle
+    drawText(fitted(desc, cw - 20, 12), cx, paneY + 135, 12, t.mute, z + 8)
+    local listTop = paneY + 166
+    local listBottom = paneY + paneH - 83
+    if tab then
+        if #tab.Cards > 0 then
+            local gap, count = 12, math.min(3, #tab.Cards)
+            local cardWidth = (cw - gap * (count-1)) / count
+            for i = 1, count do
+                local c = tab.Cards[i]
+                local bx = cx + (i-1) * (cardWidth + gap)
+                frame(bx, listTop, cardWidth, 165, t.line, t.card, 22, z + 5, opacity)
+                drawText(c.Number, bx + 20, listTop + 27, 12, t.mute, z + 8, true)
+                drawText(fitted(c.Name, cardWidth - 63, 13), bx + 48, listTop + 27, 13, t.text, z + 8, true)
+                drawText(fitted(c.Kicker, cardWidth - 40, 11), bx + 20, listTop + 49, 11, t.mute, z + 8)
+                drawText(fitted(c.Value, cardWidth - 40, 17), bx + 20, listTop + 84, 17, t.text, z + 8, true)
+                drawText(fitted(c.Description, cardWidth - 40, 11), bx + 20, listTop + 106, 11, t.sub, z + 8)
+                drawButton(bx + 18, listTop + 116, cardWidth - 36, 31, c.Button, "soft", t, z + 8,
+                    function() safe(c.Callback, c) end, window)
+            end
+            listTop = listTop + 177
+        end
+        local sectionCount = #tab.Sections
+        if sectionCount > 0 then
+            local regionHeight = math.max(45, listBottom - listTop)
+            frame(cx, listTop, cw, regionHeight, t.line, t.card, 23, z + 4, opacity)
+            local contentX, contentW = cx + 18, cw - 36
+            local contentTop, contentBottom = listTop + 16, listBottom - 12
+            local currentY = contentTop - tab.Scroll
+            local contentHeight = 0
+            for _, section in ipairs(tab.Sections) do
+                local sectionHeight = 46
+                if section.Expanded then
+                    for _, c in ipairs(section.Controls) do
+                        if c.Visible and not c.Destroyed then sectionHeight = sectionHeight + controlHeight(c) + 7 end
                     end
                 end
+                sectionHeight = sectionHeight + 8
+                if currentY >= contentTop and currentY + 38 <= contentBottom then
+                    frame(contentX, currentY, contentW, 38, t.line, t.card, 18, z + 5, opacity)
+                    drawText(fitted(section.Name, contentW - 70, 13), contentX + 15, currentY + 19, 13, t.text, z + 8, true)
+                    drawText(section.Expanded and "-" or "+", contentX + contentW - 20, currentY + 19, 15, t.sub, z + 8, true, true)
+                    region(contentX, currentY, contentW, 38, function() section:SetExpanded(not section.Expanded) end, window, "section")
+                end
+                local ry = currentY + 45
+                if section.Expanded then
+                    for _, c in ipairs(section.Controls) do
+                        if c.Visible and not c.Destroyed then
+                            local rh = controlHeight(c)
+                            if ry >= contentTop and ry + rh <= contentBottom then
+                                paintControl(c, contentX, ry, contentW, rh, t, z + 6)
+                            end
+                            ry = ry + rh + 7
+                        end
+                    end
+                end
+                currentY = currentY + sectionHeight + 10
+                contentHeight = contentHeight + sectionHeight + 10
             end
-            currentY = currentY + sectionHeight + 10
-            contentHeight = contentHeight + sectionHeight + 10
+            tab.MaxScroll = math.max(0, contentHeight - (contentBottom - contentTop))
+            if tab.Scroll > tab.MaxScroll then tab.Scroll = tab.MaxScroll end
+            if tab.MaxScroll > 0 then
+                local scrollX, scrollY = cx + cw - 84, listTop + 4
+                drawButton(scrollX, scrollY, 26, 26, "^", "soft", t, z + 12,
+                    function() tab.Scroll = clamp(tab.Scroll - 115, 0, tab.MaxScroll); markedDirty() end, window, tab.Scroll <= 0)
+                drawButton(scrollX + 32, scrollY, 26, 26, "v", "soft", t, z + 12,
+                    function() tab.Scroll = clamp(tab.Scroll + 115, 0, tab.MaxScroll); markedDirty() end, window, tab.Scroll >= tab.MaxScroll)
+            end
         end
-        tab.MaxScroll = math.max(0, contentHeight - (contentBottom - contentTop))
-        if tab.Scroll > tab.MaxScroll then tab.Scroll = tab.MaxScroll end
-        -- Always-available scroll buttons, in addition to mouse wheel and PgUp/PgDn.
-        local footerY = y + h - 46
-        drawText("" .. #tab.Sections .. " sections", cx + 14, footerY + 12, 11, theme.mute, z + 6)
-        drawText(tostring(math.floor(tab.Scroll)) .. "/" .. tostring(math.floor(tab.MaxScroll)), cx + cw - 113, footerY + 12, 11, theme.sub, z + 6, false, true)
-        drawButton(cx + cw - 63, footerY, 25, 25, "^", "soft", theme, z + 6,
-            function() tab.Scroll = clamp(tab.Scroll - 115, 0, tab.MaxScroll); markedDirty() end, window, tab.Scroll <= 0)
-        drawButton(cx + cw - 33, footerY, 25, 25, "v", "soft", theme, z + 6,
-            function() tab.Scroll = clamp(tab.Scroll + 115, 0, tab.MaxScroll); markedDirty() end, window, tab.Scroll >= tab.MaxScroll)
-        region(cx, contentTop, cw, contentBottom - contentTop, nil, window, "scrollarea")
     else
-        drawText("Create a tab to get started.", cx + 25, listTop + 60, 14, theme.sub, z + 7)
+        drawText("Create a tab to get started.", cx + 20, listTop + 55, 14, t.sub, z + 8)
     end
-    -- Resize handle; cursor dragging is constrained by min dimensions.
-    rect(x + w - 27, y + h - 28, 3, 3, theme.sub, 1, z + 15, opacity)
-    rect(x + w - 34, y + h - 28, 3, 3, theme.sub, 1, z + 15, opacity)
-    rect(x + w - 27, y + h - 35, 3, 3, theme.sub, 1, z + 15, opacity)
+    -- Thin footer divider and status instead of generic big dark status block.
+    local fy = paneY + paneH - 72
+    line(cx, fy, cx + cw, fy, t.line, z + 7, 1, opacity)
+    circle(cx + 5, fy + 23, 3, GOOD, z + 8, opacity)
+    drawText(fitted(window.Footer ~= "" and window.Footer or ("Stance UI  " .. VERSION), cw - 35, 11),
+        cx + 17, fy + 23, 11, t.text, z + 8, true)
+    drawText("F4  show / hide", cx, fy + 43, 11, t.mute, z + 8)
+    local rightEdge = cx + cw
+    for i = #window.FooterActions, 1, -1 do
+        local action = window.FooterActions[i]
+        rightEdge = rightEdge - action.Width
+        drawButton(rightEdge, fy + 13, action.Width, 34, action.Name, action.Style, t, z + 9,
+            function() safe(action.Callback) end, window)
+        rightEdge = rightEdge - 8
+    end
+    rect(x + w - 28, y + h - 26, 3, 3, t.mute, 1, z + 15, opacity)
+    rect(x + w - 33, y + h - 26, 3, 3, t.mute, 1, z + 15, opacity)
+    rect(x + w - 28, y + h - 31, 3, 3, t.mute, 1, z + 15, opacity)
     region(x + w - 24, y + h - 24, 24, 24, function()
-        Engine.drag = { kind = "resize", window = window, ox = Engine.mouseX, oy = Engine.mouseY, w = w, h = h }
+        Engine.drag = {kind="resize", window=window, ox=Engine.mouseX, oy=Engine.mouseY, w=w, h=h}
     end, window, "resize")
 end
 
@@ -1036,6 +1250,52 @@ local function drawDropdownPopup(popup)
     end
     popup.drawn = { x = px, y = py, w = popup.w, h = ph }
 end
+local function drawSearchPopup(w)
+    if not w.Visible or w.Minimized or not w._searching then return end
+    local t, z = themeOf(w), #Stance.Windows * 100 + 85
+    local vw, vh = viewport()
+    local width = math.min(365, w.Width - 180)
+    local x = clamp(w.X + w.Width - width - 62, 5, vw - width - 5)
+    local y = w.Y + 72
+    local results = {}
+    local query = w._searchQuery:lower()
+    for _, tab in ipairs(w.Tabs) do
+        if query == "" or tab.Name:lower():find(query, 1, true) then
+            results[#results + 1] = {tab=tab, name=tab.Name, section=nil}
+        end
+        for _, section in ipairs(tab.Sections) do
+            for _, control in ipairs(section.Controls) do
+                if query ~= "" and control.Name:lower():find(query, 1, true) then
+                    results[#results + 1] = {tab=tab, name=tab.Name.." / "..control.Name, section=section}
+                end
+            end
+        end
+    end
+    local count = math.min(7, #results)
+    local height = 55 + math.max(1, count) * 33
+    region(0, 0, vw, vh, function() w._searching=false; Engine.focus=nil end, w, "overlay")
+    frame(x, y, width, height, t.line, t.bg, 18, z + 1, w.Opacity)
+    drawText("SEARCH", x + 16, y + 15, 10, t.mute, z + 3, true)
+    frame(x + 12, y + 24, width - 24, 27, t.line, t.card, 14, z + 3, w.Opacity)
+    region(x + 12, y + 24, width - 24, 27, function() Engine.focus = {control=w._searchControl,window=w} end, w, "textbox")
+    drawText(fitted(w._searchQuery ~= "" and w._searchQuery or "Search tabs and controls...",width - 52,12),
+        x + 24, y + 38, 12, w._searchQuery ~= "" and t.text or t.mute, z + 5)
+    if count == 0 then
+        drawText("No matches", x + 20, y + 70, 12, t.mute, z + 5)
+    end
+    for i=1,count do
+        local item = results[i]
+        local iy = y + 55 + (i-1)*33
+        if hovering(x + 11, iy, width - 22, 30) then
+            frame(x + 11, iy, width - 22, 30, t.lineHi, t.hover, 15, z + 4, w.Opacity)
+        end
+        drawText(fitted(item.name,width - 54,12),x + 22,iy+15,12,t.text,z+6)
+        region(x + 11,iy,width - 22,30,function()
+            w:SelectTab(item.tab)
+            if item.section then item.section:SetExpanded(true); item.tab.Scroll=0 end
+        end,w,"searchresult")
+    end
+end
 local function drawModal(window)
     if not window._modal or not window.Visible then return end
     local theme = themeOf(window)
@@ -1080,6 +1340,7 @@ local function render()
     beginFrame()
     for i, window in ipairs(Stance.Windows) do paintWindow(window, i) end
     if Engine.popup and not Engine.popup.window._modal then drawDropdownPopup(Engine.popup) end
+    for _, window in ipairs(Stance.Windows) do if window._searching and not window._modal then drawSearchPopup(window) end end
     for _, window in ipairs(Stance.Windows) do if window._modal then drawModal(window) end end
     drawNotifications()
     endFrame()
@@ -1133,7 +1394,11 @@ local function handleText(dt)
     if not activeRoblox() then Engine.typingKey = nil; return end
     local pressed = nil
     if isDown(0x1B) then
-        if Engine.typingKey ~= 0x1B then Engine.focus = nil end
+        if Engine.typingKey ~= 0x1B then
+            if f.window and f.window._searchControl == c then f.window._searching = false end
+            Engine.focus = nil
+            markedDirty()
+        end
         Engine.typingKey = 0x1B
         return
     end
@@ -1229,8 +1494,9 @@ local function scrollAtMouse(delta)
     for i = #Stance.Windows, 1, -1 do
         local w = Stance.Windows[i]
         if w.Visible and not w.Minimized and w.SelectedTab then
-            local cx, cy = w.X + 181, w.Y + 164
-            if hovering(cx, cy, w.Width - 203, w.Height - 225) then
+            local cx, cy = w.X + 127, w.Y + 180
+            if w.SelectedTab and #w.SelectedTab.Cards > 0 then cy = cy + 177 end
+            if hovering(cx, cy, w.Width - 167, w.Height - (cy - w.Y) - 100) then
                 local tab = w.SelectedTab
                 tab.Scroll = clamp(tab.Scroll - delta * 55, 0, tab.MaxScroll)
                 markedDirty()
@@ -1386,7 +1652,7 @@ end
 Stance._unloadFn = function() Stance:Unload() end
 if type(_G) == "table" then
     _G.StanceUIUnload = Stance._unloadFn
-    _G.StanceUI = Stance -- Matcha loadstring() drops top-level return values.
+    _G.StanceUI = Stance -- Matcha may discard chunk return values
 end
 connectRunService()
 return Stance

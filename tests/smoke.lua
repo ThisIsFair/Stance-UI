@@ -1,6 +1,7 @@
 -- Runs in a mocked Lua runtime; does not connect to Roblox.
 local made = 0
 local removed = 0
+local frames = 0
 local files = {}
 local mouse = {X = 0, Y = 0}
 local pressed = false
@@ -53,10 +54,13 @@ local services = {
 game = {GetService = function(_, name) return assert(services[name], name) end}
 
 local ui = assert(dofile("Source.lua"))
-assert(ui.Version == "0.1.0")
+assert(ui.Version == "0.2.0")
 assert(_G.StanceUI == ui, "library must export itself to _G.StanceUI")
 local w = ui:CreateWindow({Id="Test", Title="Demo", Position={100,60}, Size={880,620}, ConfigFile="test.json"})
 local tab = w:CreateTab("Main")
+local settings = w:CreateTab({Name="Settings",Icon="sliders"})
+local cards = settings:CreateCard({Name="Card",Value="Ready",Button="Main",Callback=function() w:SelectTab(tab) end})
+assert(#settings.Cards == 1 and cards.Value == "Ready")
 local sec = tab:CreateSection("Testing")
 local presses, toggles, sliderChanges, binds = 0, 0, 0, 0
 local toggle = sec:CreateToggle({Name="Enabled", Flag="enabled", Default=false,
@@ -86,6 +90,10 @@ assert(w:SetFlag("volume", 70) and slider:Get() == 70)
 assert(w:SetTheme("Purple") and not w:SetTheme("NotTheme"))
 w:SetAccent({12,34,56})
 w:SetOpacity(0.7)
+assert(w:SetStatus("Ready", true) == nil)
+local action = w:CreateFooterButton({Name="Apply",Style="primary",Width=100,Callback=function() presses=presses+1 end})
+assert(action.Name == "Apply")
+w:SetTheme("Mono");w:SetAccent(nil)
 ui:Render()
 assert(made > 20, "no drawing objects were created")
 local stats = ui:GetStats()
@@ -98,27 +106,40 @@ local function click(x,y)
     pressed = false; ui:Step(1/60)
 end
 -- Control placed under the section header, click anywhere in toggle row.
-click(350, 60+164+10+45+30)
+click(350, 335)
 assert(toggle:Get() == true and toggles == 1, "toggle click failed")
 -- Slider input uses held mouse drag and incremental steps.
-click(610, 407)
+click(610, 429)
 assert(slider:Get() >= 40 and slider:Get() <= 55, "slider click failed")
 -- Multi-select popup must handle options without closing after a selection.
-click(760, 465)
-click(730, 509)
+click(760, 485)
+click(730, 516)
 assert(#dropdown:Get() == 1 and dropdown:Get()[1] == "C", "dropdown option click failed")
 assert(not inputEnabled or not pressed, "input gating did not execute")
 click(1900,1040) -- dismiss the multi-select popup
 mouse.X,mouse.Y=1900,1040; ui:Step(1/60)
 assert(inputEnabled, "input wasn't restored outside window")
 
+-- Searching for a tab must actually navigate, not just draw a decorative button.
+click(860, 105)
+assert(w._searching, "Search button failed to open")
+keys[0x53] = true -- S, matches Settings and main's section name only if present
+ui:Step(1/60);keys[0x53]=false;ui:Step(1/60)
+ui:Render()
+click(650, 235)
+assert(w.SelectedTab == settings and not w._searching, "Search result failed to navigate")
+-- Main returns through the circular icon rail.
+click(151, 127)
+assert(w.SelectedTab == tab, "Circular navigation did not select Main")
+
 -- Window close/minimize buttons must not be hidden behind the drag region.
-click(100+880-51+12,60+25+12)
+click(932, 105)
 assert(w.Visible == false, "close button did not register")
 w:SetVisible(true); ui:Render()
-click(100+880-51-34+12,60+25+12)
-assert(w.Minimized == true, "minimize button did not register")
-w:Minimize(false)
+w:Minimize(true)
+ui:Render()
+click(891, 97)
+assert(w.Minimized == false, "minimized plus button did not restore")
 
 -- Keybind OnPressed only fires on a pressed edge.
 keys[0x72] = true; ui:Step(1/60); ui:Step(1/60)

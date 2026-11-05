@@ -1,111 +1,93 @@
--- Stance UI example. Matcha does not return values from loadstring chunks.
+-- Stance UI / Mono playground. Uses the original Stance visual language.
 local Stance = loadstring(httpget("https://raw.githubusercontent.com/ThisIsFair/Stance-UI/main/Source.lua"))() or _G.StanceUI
-assert(type(Stance) == "table" and type(Stance.CreateWindow) == "function", "Stance UI failed to initialize; check Matcha console")
+assert(type(Stance) == "table" and type(Stance.CreateWindow) == "function", "Stance UI failed to initialize")
 
 local Window = Stance:CreateWindow({
-    Id = "example",
-    Title = "Stance UI Playground",
-    Subtitle = "A standalone Matcha Drawing API library",
-    Theme = "Mono",
-    Size = {900, 650},
-    ToggleKey = 0x73, -- F4
-    ConfigFile = "stance_ui_example.json",
-    AutoSave = true,
+    Id = "stance-mono-demo",
+    Title = "Stance UI",
+    HomeTitle = "Your workspace",
+    Subtitle = "A standalone Drawing API library with the original Stance design.",
+    Theme = "Mono", Size = {900, 680}, ToggleKey = 0x73, -- F4
+    ConfigFile = "stance_ui_mono_demo.json", AutoSave = true,
+    Footer = "Stance UI  /  Mono", Status = "Ready",
 })
+local Home = Window:CreateTab({Name="Home", Icon="home", Description="Build a clean interface with Stance components."})
+local Browse = Window:CreateTab({Name="Browse", Icon="list", Description="Explore and interact with reusable controls."})
+local Favorites = Window:CreateTab({Name="Favorites", Icon="star", Description="Save your commonly used settings."})
+local Mix = Window:CreateTab({Name="Mix", Icon="layers", Description="Combine components in any order."})
+local Presets = Window:CreateTab({Name="Presets", Icon="bookmark", Description="Save and restore your configuration."})
+local Controls = Window:CreateTab({Name="Controls", Icon="keys", Description="Keyboard shortcuts and input testing."})
+local Settings = Window:CreateTab({Name="Settings", Icon="sliders", Description="Themes, accents and sizing."})
 
-local Home = Window:CreateTab({Name = "Home", Icon = "H", Description = "Overview and quick actions"})
-local Components = Window:CreateTab({Name = "Components", Icon = "C", Description = "Try the input components"})
-local Appearance = Window:CreateTab({Name = "Appearance", Icon = "A", Description = "Change the window's look"})
+Home:CreateCard({Name="Windows",Kicker="Create and manage layouts",Value="Mono UI",
+    Description="Resizable, draggable shell",Button="Browse components",Callback=function() Window:SelectTab(Browse) end})
+Home:CreateCard({Name="Controls",Kicker="Interactive elements",Value="All in one",
+    Description="Toggles, sliders, fields...",Button="Configure controls",Callback=function() Window:SelectTab(Controls) end})
+Home:CreateCard({Name="Appearance",Kicker="Your style",Value="4 themes",
+    Description="Mono with custom accents",Button="Appearance settings",Callback=function() Window:SelectTab(Settings) end})
 
-local Welcome = Home:CreateSection("Welcome")
-Welcome:CreateParagraph({
-    Name = "Stance UI",
-    Description = "Independent of the animation changer. F4 shows or hides this window.",
-})
-Welcome:CreateButton({
-    Name = "Notification",
-    Description = "Display a toast in the bottom-right corner",
-    Callback = function()
-        Window:Notify({Title = "It works!", Content = "Stance UI is running.", Type = "Success"})
-    end,
-})
-Welcome:CreateButton({
-    Name = "Confirmation dialog",
-    Callback = function()
-        Window:Confirm({
-            Title = "Test the dialog?",
-            Content = "This is a reusable confirmation component.",
-            OnConfirm = function()
-                Window:Notify({Title = "Confirmed", Content = "You clicked Confirm", Type = "Success"})
-            end,
-        })
-    end,
-})
+local Start=Home:CreateSection("Your library")
+Start:CreateParagraph({Name="Stance Mono",Description="The original black-and-white Stance look, now available for any Matcha script."})
+Start:CreateButton({Name="Show notification",Callback=function()
+    Window:Notify({Title="Stance UI",Content="Welcome to the Mono library!",Type="Success"})
+end})
+Start:CreateButton({Name="Confirm action",Callback=function()
+    Window:Confirm({Title="Stance confirmation",Content="This dialog is reusable.",
+        OnConfirm=function() Window:Notify({Title="Confirmed",Content="Action accepted",Type="Success"}) end})
+end})
 
-local Basic = Components:CreateSection("Basic controls")
-Basic:CreateToggle({
-    Name = "Enable feature", Description = "A boolean value", Flag = "enabled", Default = false,
-    Callback = function(value) print("Enabled:", value) end,
-})
-Basic:CreateSlider({
-    Name = "Volume", Description = "0 to 100 in steps of 5", Flag = "volume",
-    Min = 0, Max = 100, Increment = 5, Default = 50,
-    Callback = function(value) print("Volume:", value) end,
-})
-Basic:CreateDropdown({
-    Name = "Quality", Flag = "quality", Options = {"Low", "Medium", "High", "Ultra"},
-    Default = "High", Callback = function(value) print("Quality:", value) end,
-})
-Basic:CreateDropdown({
-    Name = "Active filters", Flag = "filters", Multiple = true,
-    Options = {"Bloom", "Motion Blur", "Sharpen", "Vignette", "Grain", "Depth of Field", "Ambient Occlusion", "Film"},
-    Default = {"Bloom", "Sharpen"},
-    Callback = function(values) print("Active filters:", table.concat(values, ", ")) end,
-})
-
-local Advanced = Components:CreateSection("Advanced controls")
-Advanced:CreateTextbox({
-    Name = "Display name", Flag = "display_name", Default = "Stance",
-    MaxLength = 30, Placeholder = "Type a name...",
-    Callback = function(value) print("Name changed:", value) end,
-    OnSubmit = function(value) print("Submitted:", value) end,
-})
-Advanced:CreateKeybind({
-    Name = "Custom shortcut", Flag = "shortcut", Default = 0x75, -- F6
-    Callback = function(key) print("New key:", key) end,
-    OnPressed = function() Window:Notify("F6 shortcut activated") end,
-})
-Advanced:CreateColorPicker({
-    Name = "Highlight color", Flag = "tint", Default = "#8B5CF6",
-    Callback = function(rgb) print("Color:", rgb[1], rgb[2], rgb[3]) end,
-})
+local Basic=Browse:CreateSection("Basic controls")
+Basic:CreateToggle({Name="Enable feature",Description="A boolean value",Flag="enabled",Default=false,
+    Callback=function(v) print("Enabled:",v) end})
+Basic:CreateSlider({Name="Volume",Description="0 to 100 in steps of 5",Flag="volume",Min=0,Max=100,
+    Increment=5,Default=50,Callback=function(v) print("Volume:",v) end})
+Basic:CreateDropdown({Name="Quality",Flag="quality",Options={"Low","Medium","High","Ultra"},Default="High"})
+Basic:CreateDropdown({Name="Active filters",Flag="filters",Multiple=true,
+    Options={"Bloom","Motion Blur","Sharpen","Vignette","Grain","Depth of Field","Ambient Occlusion","Film"},
+    Default={"Bloom","Sharpen"}})
+local Advanced=Browse:CreateSection("Advanced controls")
+Advanced:CreateTextbox({Name="Display name",Flag="name",Default="Stance",MaxLength=30,Placeholder="Type a name..."})
+Advanced:CreateColorPicker({Name="Accent",Flag="color",Default="#FFFFFF"})
 Advanced:CreateDivider()
-Advanced:CreateLabel({Name = "Components are created in their own sections."})
+Advanced:CreateLabel({Name="Tabs, sections and controls are all reusable."})
 
-local Styling = Appearance:CreateSection("Appearance")
-Styling:CreateDropdown({
-    Name = "Theme", Options = {"Mono", "Purple", "Dark", "Midnight"}, Default = "Mono",
-    Callback = function(value) Window:SetTheme(value) end,
-})
-Styling:CreateSlider({
-    Name = "Window opacity", Min = 0.4, Max = 1, Increment = 0.1, Precision = 1, Default = 1,
-    Callback = function(value) Window:SetOpacity(value) end,
-})
-Styling:CreateColorPicker({
-    Name = "Accent override", Default = "#8B5CF6",
-    Callback = function(rgb) Window:SetAccent(rgb) end,
-})
-Styling:CreateButton({
-    Name = "Reset accent to theme default",
-    Callback = function() Window:SetAccent(nil) end,
-})
-Styling:CreateButton({
-    Name = "Save config now",
-    Callback = function()
-        local ok, err = Window:SaveConfig()
-        Window:Notify({Title = ok and "Saved" or "Failed", Content = ok and "Configuration stored" or tostring(err), Type = ok and "Success" or "Error"})
-    end,
-})
+local Fav=Favorites:CreateSection("Quick actions")
+Fav:CreateLabel({Name="Build your own favorites using Stance flags and callbacks."})
+Fav:CreateButton({Name="Enable demo feature",Callback=function() Window:SetFlag("enabled",true);Window:Notify("Feature enabled") end})
 
-Window:SelectTab("Home")
-Window:Notify({Title = "Stance UI", Content = "Press F4 to hide or show the window", Type = "Info"})
+local MixSection=Mix:CreateSection("Mix and match")
+MixSection:CreateParagraph({Name="Fully reusable",Description="Compose entirely different pages using the same Mono components."})
+MixSection:CreateToggle({Name="Experimental option",Flag="experimental",Default=false})
+MixSection:CreateSlider({Name="Effect strength",Flag="strength",Min=0,Max=1,Increment=0.05,Precision=2,Default=0.5})
+
+local PresetSection=Presets:CreateSection("Configuration")
+PresetSection:CreateButton({Name="Save configuration",Callback=function()
+    local ok,err=Window:SaveConfig()
+    Window:Notify({Title=ok and "Saved" or "Failed",Content=ok and "Settings saved" or tostring(err),Type=ok and "Success" or "Error"})
+end})
+PresetSection:CreateButton({Name="Reload configuration",Callback=function()
+    local ok,err=Window:LoadConfig()
+    Window:Notify({Title=ok and "Loaded" or "Failed",Content=ok and "Settings loaded" or tostring(err),Type=ok and "Success" or "Error"})
+end})
+local KeySection=Controls:CreateSection("Keyboard")
+KeySection:CreateKeybind({Name="Demo shortcut",Flag="shortcut",Default=0x75,
+    OnPressed=function() Window:Notify({Title="Shortcut",Content="Key pressed",Type="Success"}) end})
+KeySection:CreateParagraph({Name="F4",Description="Show or hide Stance. Search tabs and controls with the top-right Search button."})
+local Appearance=Settings:CreateSection("Appearance")
+Appearance:CreateDropdown({Name="Theme",Options={"Mono","Purple","Dark","Midnight"},Default="Mono",
+    Callback=function(v) Window:SetTheme(v) end})
+Appearance:CreateSlider({Name="Opacity",Min=0.4,Max=1,Increment=0.1,Precision=1,Default=1,
+    Callback=function(v) Window:SetOpacity(v) end})
+Appearance:CreateColorPicker({Name="Accent override",Default="#FFFFFF",Callback=function(rgb) Window:SetAccent(rgb) end})
+Appearance:CreateButton({Name="Reset accent",Callback=function() Window:SetAccent(nil) end})
+
+Window:CreateFooterButton({Name="Reset",Style="ghost",Width=80,Callback=function()
+    Window:SetTheme("Mono");Window:SetAccent(nil);Window:SetStatus("Reset")
+end})
+Window:CreateFooterButton({Name="Undo",Width=84,Callback=function() Window:Notify("Wire your own undo logic here") end})
+Window:CreateFooterButton({Name="Apply",Style="primary",Width=112,Callback=function()
+    Window:SetStatus("Applied")
+    Window:Notify({Title="Applied",Content="Your settings are ready",Type="Success"})
+end})
+Window:SelectTab(Home)
+Window:Notify({Title="Stance UI",Content="Mono loaded. Press F4 to toggle.",Type="Info"})

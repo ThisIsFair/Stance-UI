@@ -1,11 +1,11 @@
-# Stance UI API — v0.1.0
+# Stance UI API — v0.2.0
 
 The API is intentionally declarative. Create windows, then tabs, then sections, then controls. Tab-level `Create*` methods automatically create an implicit `General` section.
 
 ## Initialization and lifecycle
 
 ```lua
-local Stance = loadstring(readfile("Source.lua"))() or _G.StanceUI
+local Stance = loadstring(httpget("https://raw.githubusercontent.com/ThisIsFair/Stance-UI/main/Source.lua"))() or _G.StanceUI
 
 local Window = Stance:CreateWindow({
     Id = "my-script",                  -- Optional; stable identifier
@@ -45,7 +45,7 @@ Stance:Unload() -- clears every window, drawing, event connection and input capt
 
 `Stance:CreateWindow()` can be called more than once. `Stance:GetWindow(id)` locates an instance. `Stance:Notify(...)` uses the last window if present. `Stance:GetStats()` returns Drawing pool counts and input state. `Stance:Render()` and `Stance:Step(dt)` are provided for deterministic testing; in Matcha, the frame loop is normally automatic.
 
-Matcha discards top-level `loadstring()` return values, so the library is also exposed as `_G.StanceUI`. Rerunning `Source.lua` unloads the previous Stance UI instance via `_G.StanceUIUnload` to avoid duplicate event handlers.
+Matcha may discard `loadstring()` return values; the current instance is also available as `_G.StanceUI`. Rerunning `Source.lua` unloads the previous instance via `_G.StanceUIUnload`.
 
 ## Tabs and sections
 
@@ -115,7 +115,7 @@ Section:CreateTextbox({Name="Display name", Flag="name", Default="", MaxLength=4
 -- Alias: CreateInput
 ```
 
-Typing is handled with polled keyboard virtual key codes. Escape blurs the field; Enter blurs and fires `OnSubmit`. The v0.1.0 keyboard layout is **US QWERTY**; non-US layouts and IME composition are not supported.
+Typing is handled with polled keyboard virtual key codes. Escape blurs the field; Enter blurs and fires `OnSubmit`. The v0.2.0 keyboard layout is **US QWERTY**; non-US layouts and IME composition are not supported.
 
 ### Keybind
 
@@ -177,3 +177,21 @@ The renderer is intentionally based on Matcha's known `Drawing` primitives (`Squ
 ## Current limitations
 
 The project has passed a local mocked-runtime smoke test, but it has **not** yet been visually verified inside Matcha. The Drawing implementation has no built-in clipping; partially visible rows are culled during scrolling instead of being pixel-clipped. Native touch/controller navigation, IME composition, font measurement, and screen-reader semantics are not supported. On platforms that don't forward `UserInputService.InputChanged`, use the scroll buttons or Page Up/Page Down.
+
+## Original Stance Mono layout (v0.2.0)
+
+The default `Mono` theme has the same black/white palette and circular icon rail as the Matcha Animation Changer's Mono UI. Standard icon names: `home`, `list`, `star`, `layers`, `bookmark`, `keys`, and `sliders`. When `Icon` is omitted or a one-letter abbreviation, the library chooses an icon from the tab name; other names fall back to an initial. The final `Settings` / `Appearance` tab is pinned to the bottom of the rail.
+
+```lua
+local Home = Window:CreateTab({Name="Home",Icon="home",Description="Overview"})
+Home:CreateCard({
+    Number="01", Name="Scripts", Kicker="A reusable dashboard card",
+    Value="3 running", Description="Your status", Button="Browse",
+    Callback=function(card) print(card.Name) end,
+})
+Window:SetStatus("Applied", true) -- text and green-dot boolean
+Window:SetFooter("Custom status details")
+Window:CreateFooterButton({Name="Apply",Style="primary",Width=112,Callback=function() print("Apply") end})
+```
+
+Maximum three dashboard cards per tab. `CreateFooterButton` styles are `soft`, `primary`, `ghost`, and `danger`, and actions are aligned right. The top-right Search control matches tab names and control names, selecting the matching destination.
