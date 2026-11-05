@@ -1,7 +1,5 @@
--- Stance UI example. Place Source.lua in Matcha's accessible workspace first.
--- Once the repository is published, you may replace the line below with:
--- local Stance = loadstring(httpget("https://raw.githubusercontent.com/ThisIsFair/Stance-UI/main/Source.lua"))()
-local Stance = loadstring(readfile("Source.lua"))()
+-- Stance UI example. Load the library directly from GitHub.
+local Stance = loadstring(httpget("https://raw.githubusercontent.com/ThisIsFair/Stance-UI/main/Source.lua"))()
 
 local Window = Stance:CreateWindow({
     Id = "example",
